@@ -6,7 +6,7 @@ const tabs = [
   { to: 'menu', label: 'Menu', icon: '☰' },
   { to: 'cart', label: 'Cart', icon: '▢' },
   { to: 'orders', label: 'Orders', icon: '☰' },
-  { to: 'track', label: 'Track', icon: '◎' },
+  { to: 'account', label: 'Account', icon: '☺' },
 ];
 
 export function Shell({ slug, children }) {

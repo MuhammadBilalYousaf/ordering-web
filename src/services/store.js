@@ -1,6 +1,7 @@
 import { signInAnonymously } from 'firebase/auth';
-import { addDoc, collection, doc, onSnapshot, serverTimestamp } from 'firebase/firestore';
+import { addDoc, collection, doc, onSnapshot, query, serverTimestamp, where } from 'firebase/firestore';
 import { auth, db } from '../firebase/config';
+import { saveProfile } from './auth';
 
 export function watchBusiness(slug, onData, onError) {
   return onSnapshot(
@@ -30,8 +31,22 @@ export function watchOrder(orderId, onData, onError) {
   );
 }
 
+export function watchMyOrders(uid, onData, onError) {
+  if (!uid) return () => {};
+  const orders = query(collection(db, 'customerOrders'), where('customerUid', '==', uid));
+  return onSnapshot(orders, (snap) => {
+    onData(snap.docs.map((item) => ({ id: item.id, ...item.data() })));
+  }, () => onError('Your orders could not be loaded.'));
+}
+
 export async function placeOrder({ business, cart, customerName, phone, orderType, paymentReference }) {
   const credential = auth.currentUser ? { user: auth.currentUser } : await signInAnonymously(auth);
+  const user = credential.user;
+  try {
+    await saveProfile(user, { name: customerName, phone });
+  } catch (error) {
+    console.error(error);
+  }
   const items = cart.lines.map((line) => ({
     productId: line.productId,
     name: line.name,
@@ -46,9 +61,11 @@ export async function placeOrder({ business, cart, customerName, phone, orderTyp
   const ref = await addDoc(collection(db, 'customerOrders'), {
     businessId: business.businessId,
     branchId: business.branchId || null,
-    customerUid: credential.user.uid,
+    customerUid: user.uid,
     customerName: customerName.trim(),
     phone: phone.trim(),
+    customerEmail: user.email || '',
+    customerKind: user.isAnonymous ? 'guest' : 'account',
     orderType,
     items,
     subtotal: total,

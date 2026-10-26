@@ -1,27 +1,40 @@
 import { useEffect, useState } from 'react';
 import { Link, useParams } from 'react-router-dom';
 import { useBusiness } from '../context/BusinessContext';
+import { isGuest, watchAuth } from '../services/auth';
 import { readCustomer, saveCustomer } from '../services/cache';
-import { watchOrder } from '../services/store';
+import { watchMyOrders, watchOrder } from '../services/store';
 import { money } from '../utils/pricing';
 import { statusLabels, steps } from '../utils/status';
 
 export function OrdersPage() {
   const { slug } = useBusiness();
   const saved = readCustomer(slug);
-  if (saved.orders.length === 0) {
+  const [user, setUser] = useState(null);
+  const [cloud, setCloud] = useState([]);
+  useEffect(() => watchAuth(setUser), []);
+  useEffect(() => {
+    if (!user || isGuest(user)) return undefined;
+    return watchMyOrders(user.uid, setCloud, () => {});
+  }, [user]);
+  const byId = new Map(saved.orders.map((order) => [order.id, order]));
+  cloud.forEach((order) => byId.set(order.id, { id: order.id, orderNumber: order.orderNumber, total: order.total }));
+  const orders = [...byId.values()];
+  if (orders.length === 0) {
     return (
       <div className="px-5 py-8">
         <h1 className="text-2xl font-bold">Orders</h1>
-        <p className="mt-3 text-stone-500">Orders you place on this phone are kept here.</p>
+        <p className="mt-3 text-stone-500">Guest orders stay on this phone. An account keeps them after you change phones.</p>
+        <Link to={`/b/${slug}/account`} className="mt-4 inline-block font-semibold text-brand">Sign in or create an account</Link>
       </div>
     );
   }
   return (
     <div className="px-4 py-6">
       <h1 className="text-2xl font-bold">Orders</h1>
+      <Link to={`/b/${slug}/track`} className="text-sm font-semibold text-brand">Track by number</Link>
       <div className="mt-4 grid gap-3">
-        {saved.orders.map((order) => <OrderRow key={order.id} slug={slug} order={order} />)}
+        {orders.map((order) => <OrderRow key={order.id} slug={slug} order={order} />)}
       </div>
     </div>
   );
@@ -71,7 +84,17 @@ export function OrderPage() {
   const { orderId } = useParams();
   const [order, setOrder] = useState(undefined);
   const [error, setError] = useState('');
-  useEffect(() => watchOrder(orderId, setOrder, setError), [orderId]);
+  useEffect(() => watchOrder(orderId, (value) => {
+    setOrder((previous) => {
+      if (previous && value && previous.orderStatus !== value.orderStatus && typeof Notification !== 'undefined' && Notification.permission === 'granted') {
+        new Notification(`Order ${value.orderNumber || ''}`, { body: statusLabels[value.orderStatus] || 'Order updated' });
+      }
+      return value;
+    });
+  }, setError), [orderId]);
+  useEffect(() => {
+    if (typeof Notification !== 'undefined' && Notification.permission === 'default') Notification.requestPermission();
+  }, []);
   if (error) return <p className="p-6">{error}</p>;
   if (!order) return <p className="p-8 text-center">{order === undefined ? 'Loading your order…' : 'Order not found on this phone.'}</p>;
   const active = steps.indexOf(order.orderStatus);
