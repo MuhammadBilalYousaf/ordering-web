@@ -2,14 +2,30 @@ import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { useBusiness } from '../context/BusinessContext';
 import { useCart } from '../context/CartContext';
-import { isGuest, watchAuth } from '../services/auth';
+import { isGuest, loadCustomer, watchAuth } from '../services/auth';
 import { money } from '../utils/pricing';
 
 export function HomePage() {
   const { slug, business, error } = useBusiness();
   const cart = useCart();
   const [user, setUser] = useState(undefined);
+  const [name, setName] = useState('');
   useEffect(() => watchAuth(setUser), []);
+  useEffect(() => {
+    if (!user || isGuest(user)) {
+      setName('');
+      return undefined;
+    }
+    let active = true;
+    const fallback = user.displayName || '';
+    setName(fallback);
+    loadCustomer(user.uid).then((profile) => {
+      if (active && profile?.name) setName(profile.name);
+    }).catch(() => {});
+    return () => {
+      active = false;
+    };
+  }, [user]);
   const signedIn = user && !isGuest(user);
   if (error) return <p className="p-6 text-center">{error}</p>;
   if (business === undefined) return <p className="p-8 text-center">Loading…</p>;
@@ -33,7 +49,7 @@ export function HomePage() {
           </Link>
         <Link to={`/b/${slug}/account`} className="rounded-3xl bg-white p-4 shadow-sm">
           <p className="text-sm text-stone-500">Account</p>
-          <p className="truncate text-lg font-bold">{user === undefined ? '…' : signedIn ? user.email : 'Guest'}</p>
+          <p className="truncate text-lg font-bold">{user === undefined ? '…' : signedIn ? (name || 'Account') : 'Guest'}</p>
         </Link>
         </div>
         <div className="rounded-3xl bg-orange-50 p-5">
