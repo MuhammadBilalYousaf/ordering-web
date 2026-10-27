@@ -14,6 +14,28 @@ export function MenuPage() {
   const categories = (menu.categories || []).filter((category) => category.active !== false);
   const selected = categories.find((category) => category.id === categoryId) || categories[0];
   const products = (selected?.products || []).filter((item) => item.available !== false);
+
+  function addProduct(item) {
+    const needsChoice = (item.variants || []).length > 1 || (item.addons || []).length > 0;
+    if (needsChoice) {
+      setProduct(item);
+      return;
+    }
+    const variant = item.variants?.[0] || null;
+    const priced = unitPrice(item, variant?.id || null, []);
+    cart.addLine({
+      key: [item.id, variant?.id || '', ''].join('|'),
+      productId: item.id,
+      name: item.name,
+      imageUrl: item.imageUrl || '',
+      variantId: variant?.id || null,
+      variantName: priced.variant?.name || null,
+      addons: [],
+      quantity: 1,
+      unitPrice: priced.unit,
+    });
+  }
+
   return (
     <div>
       <header className="px-5 pb-2 pt-6">
@@ -25,17 +47,25 @@ export function MenuPage() {
           <button key={category.id} type="button" className={`shrink-0 rounded-full px-4 py-2 text-sm font-semibold transition ${selected?.id === category.id ? 'bg-ink text-white' : 'bg-white'}`} onClick={() => setCategoryId(category.id)}>{category.name}</button>
         ))}
       </div>
-      <div className="grid gap-3 px-4">
+      <div className="grid grid-cols-1 gap-4 px-4 pb-24 sm:grid-cols-2">
         {products.map((item, index) => {
           const from = item.variants?.length ? Math.min(...item.variants.map((variant) => Number(variant.price) || 0)) : unitPrice(item, null, []).unit;
           return (
-            <button key={item.id} type="button" style={{ animationDelay: `${index * 40}ms` }} className="card-pop rounded-3xl bg-white p-4 text-left shadow-sm" onClick={() => setProduct(item)}>
-              <div className="flex items-start justify-between gap-3">
-                <div>
-                  <h2 className="font-semibold">{item.name}</h2>
-                  {item.description ? <p className="mt-1 text-sm text-stone-500">{item.description}</p> : null}
+            <button key={item.id} type="button" style={{ animationDelay: `${index * 40}ms` }} className="card-pop group overflow-hidden rounded-3xl bg-white text-left shadow-md shadow-stone-300/70 transition duration-300 hover:-translate-y-1 hover:shadow-xl hover:shadow-stone-400/50" onClick={() => addProduct(item)}>
+              <div className="overflow-hidden bg-orange-50">
+                {item.imageUrl
+                  ? <img src={item.imageUrl} alt="" className="h-48 w-full object-cover transition duration-500 group-hover:scale-110" />
+                  : <div className="flex h-48 w-full items-center justify-center text-4xl transition duration-500 group-hover:scale-110">🍽️</div>}
+              </div>
+              <div className="flex items-center gap-3 p-4">
+                <div className="min-w-0 flex-1">
+                  <h2 className="text-lg font-bold leading-snug">{item.name}</h2>
+                  {item.description ? <p className="mt-1 text-sm leading-snug text-stone-500">{item.description}</p> : null}
                 </div>
-                <span className="font-semibold">{money(from)}</span>
+                <div className="flex shrink-0 flex-col items-end gap-2">
+                  <span className="text-base font-bold">{money(from)}</span>
+                  <span className="rounded-full bg-brand px-4 py-2 text-sm font-semibold text-white shadow-sm transition group-hover:scale-105">Add</span>
+                </div>
               </div>
             </button>
           );
@@ -55,6 +85,7 @@ function ProductSheet({ product, onClose, onAdd }) {
   return (
     <div className="fixed inset-0 z-30 flex items-end bg-ink/40" onClick={onClose}>
       <div className="sheet-enter max-h-[88vh] w-full overflow-auto rounded-t-3xl bg-white p-5" onClick={(event) => event.stopPropagation()}>
+        {product.imageUrl ? <img src={product.imageUrl} alt="" className="mb-3 h-44 w-full rounded-2xl object-cover" /> : null}
         <h2 className="text-xl font-bold">{product.name}</h2>
         {product.description ? <p className="mt-1 text-sm text-stone-500">{product.description}</p> : null}
         <div className="mt-4 grid gap-2">
@@ -79,6 +110,7 @@ function ProductSheet({ product, onClose, onAdd }) {
             key: [product.id, variantId || '', [...addonIds].sort().join(',')].join('|'),
             productId: product.id,
             name: product.name,
+            imageUrl: product.imageUrl || '',
             variantId,
             variantName: priced.variant?.name || null,
             addons: priced.addons.map((addon) => ({ id: addon.id, name: addon.name, price: Number(addon.price) || 0 })),

@@ -12,6 +12,15 @@ body {
   animation: rise 0.35s ease;
 }
 
+.status-line {
+  animation: statusIn 0.25s ease;
+}
+
+@keyframes statusIn {
+  from { opacity: 0.4; }
+  to { opacity: 1; }
+}
+
 .card-pop {
   animation: rise 0.45s ease both;
 }
@@ -28,4 +37,13 @@ body {
 @keyframes sheet {
   from { transform: translateY(24px); }
   to { transform: none; }
+}
+
+.thumb-in {
+  animation: thumb 0.45s ease both;
+}
+
+@keyframes thumb {
+  from { opacity: 0; transform: scale(0.92); }
+  to { opacity: 1; transform: none; }
 }

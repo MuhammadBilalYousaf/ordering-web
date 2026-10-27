@@ -27,8 +27,11 @@ export function CartProvider({ slug, children }) {
         setLines((current) => {
           const index = current.findIndex((item) => item.key === line.key);
           if (index === -1) return [...current, line];
-          return current.map((item, i) => (i === index ? { ...item, quantity: item.quantity + line.quantity } : item));
+          return current.map((item, i) => (i === index ? { ...item, imageUrl: item.imageUrl || line.imageUrl || '', quantity: item.quantity + line.quantity } : item));
         });
+      },
+      removeLine(key) {
+        setLines((current) => current.filter((item) => item.key !== key));
       },
       setQuantity(key, quantity) {
         setLines((current) => current.flatMap((item) => {

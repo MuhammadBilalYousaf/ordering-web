@@ -8,7 +8,7 @@ import {
   signOut,
   updateProfile,
 } from 'firebase/auth';
-import { doc, serverTimestamp, setDoc } from 'firebase/firestore';
+import { doc, getDoc, serverTimestamp, setDoc } from 'firebase/firestore';
 import { auth, db } from '../firebase/config';
 
 export function watchAuth(onUser) {
@@ -17,6 +17,11 @@ export function watchAuth(onUser) {
 
 export function isGuest(user) {
   return Boolean(user?.isAnonymous);
+}
+
+export async function loadCustomer(uid) {
+  const snap = await getDoc(doc(db, 'customers', uid));
+  return snap.exists() ? snap.data() : null;
 }
 
 export async function continueAsGuest() {

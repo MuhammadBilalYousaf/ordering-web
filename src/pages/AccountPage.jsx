@@ -1,10 +1,11 @@
 import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { useBusiness } from '../context/BusinessContext';
-import { continueAsGuest, isGuest, signInCustomer, signOutCustomer, signUpCustomer, watchAuth } from '../services/auth';
+import { awardCompletedOrders, watchLoyalty, watchLoyaltyActivity } from '../services/loyalty';
+import { continueAsGuest, isGuest, loadCustomer, signInCustomer, signOutCustomer, signUpCustomer, watchAuth } from '../services/auth';
 
 export function AccountPage() {
-  const { slug } = useBusiness();
+  const { slug, business } = useBusiness();
   const [user, setUser] = useState(undefined);
   const [mode, setMode] = useState('signin');
   const [name, setName] = useState('');
@@ -13,8 +14,36 @@ export function AccountPage() {
   const [password, setPassword] = useState('');
   const [error, setError] = useState('');
   const [busy, setBusy] = useState(false);
+  const [profile, setProfile] = useState(null);
+  const [loyalty, setLoyalty] = useState({ pointsBalance: 0 });
+  const [activity, setActivity] = useState([]);
 
   useEffect(() => watchAuth(setUser), []);
+  useEffect(() => {
+    if (!user || isGuest(user)) {
+      setProfile(null);
+      return undefined;
+    }
+    let active = true;
+    loadCustomer(user.uid).then((data) => {
+      if (active) setProfile(data);
+    }).catch(() => {
+      if (active) setProfile(null);
+    });
+    return () => {
+      active = false;
+    };
+  }, [user]);
+  useEffect(() => {
+    if (!user || isGuest(user) || !business?.businessId) return undefined;
+    const stopBalance = watchLoyalty(business.businessId, user.uid, setLoyalty);
+    const stopActivity = watchLoyaltyActivity(business.businessId, user.uid, setActivity);
+    awardCompletedOrders(business.businessId, user.uid).catch((error) => console.error(error));
+    return () => {
+      stopBalance();
+      stopActivity();
+    };
+  }, [user, business]);
 
   async function run(action) {
     setBusy(true);
@@ -32,12 +61,55 @@ export function AccountPage() {
   if (user === undefined) return <p className="p-8 text-center">Loading account…</p>;
 
   if (user && !isGuest(user)) {
+    const displayName = profile?.name || user.displayName || 'Customer';
+    const phone = profile?.phone || '';
+    const initial = displayName.trim().charAt(0).toUpperCase() || 'C';
     return (
       <div className="px-4 py-6">
-        <h1 className="text-2xl font-bold">Account</h1>
-        <p className="mt-2 text-stone-500">Signed in as {user.email}. Repeat orders stay on this account, so loyalty discounts can be added later.</p>
-        <Link to={`/b/${slug}/orders`} className="mt-4 block rounded-full bg-ink py-3 text-center font-semibold text-white">Your orders</Link>
-        <button type="button" className="mt-3 w-full rounded-full border border-stone-300 py-3 font-semibold" onClick={() => signOutCustomer()}>Sign out</button>
+        <div className="overflow-hidden rounded-[28px] bg-gradient-to-br from-brand to-orange-700 text-white shadow-lg">
+          <div className="px-5 pb-6 pt-7">
+            <p className="text-sm font-medium text-white/80">Your account</p>
+            <div className="mt-4 flex items-center gap-4">
+              <div className="flex h-16 w-16 items-center justify-center rounded-full bg-white text-2xl font-bold text-brand shadow">{initial}</div>
+              <div className="min-w-0">
+                <h1 className="truncate text-2xl font-bold">{displayName}</h1>
+                <p className="truncate text-sm text-white/80">{user.email}</p>
+              </div>
+            </div>
+          </div>
+        </div>
+        <div className="mt-4 overflow-hidden rounded-3xl bg-white shadow-sm">
+          <div className="flex items-center justify-between border-b border-stone-100 px-4 py-4">
+            <span className="text-sm text-stone-500">Email</span>
+            <span className="max-w-[60%] truncate font-semibold">{user.email}</span>
+          </div>
+          <div className="flex items-center justify-between px-4 py-4">
+            <span className="text-sm text-stone-500">Phone</span>
+            <span className="font-semibold">{phone || 'Not added'}</span>
+          </div>
+        </div>
+        <div className="mt-4 rounded-3xl bg-white p-4 shadow-sm">
+          <p className="text-sm text-stone-500">Loyalty points</p>
+          <p className="text-3xl font-bold">{Math.floor(Number(loyalty.pointsBalance) || 0)} Points</p>
+          <p className="text-sm text-stone-500">Available to redeem: {Math.floor(Number(loyalty.pointsBalance) || 0)}</p>
+          <div className="mt-3 grid gap-2">
+            {activity.length === 0 ? <p className="text-sm text-stone-400">No loyalty activity yet.</p> : activity.map((item) => (
+              <div key={item.id} className="flex items-center justify-between text-sm">
+                <span className={item.points > 0 ? 'font-semibold text-green-700' : 'font-semibold text-brand'}>{item.points > 0 ? `+${item.points}` : item.points}</span>
+                <span className="text-stone-500">Order {item.orderNumber || ''}</span>
+                <span>{item.type === 'EARN' ? 'Earned' : item.type === 'REDEEM' ? 'Redeemed' : 'Reversed'}</span>
+              </div>
+            ))}
+          </div>
+        </div>
+        <Link to={`/b/${slug}/orders`} className="mt-4 flex items-center justify-between rounded-3xl bg-white px-4 py-4 shadow-sm">
+          <span>
+            <span className="block font-semibold">Your orders</span>
+            <span className="text-sm text-stone-500">Track what you have ordered</span>
+          </span>
+          <span className="text-brand">→</span>
+        </Link>
+        <button type="button" className="mt-4 w-full rounded-full border border-stone-300 bg-white py-3 font-semibold" onClick={() => signOutCustomer()}>Sign out</button>
       </div>
     );
   }
