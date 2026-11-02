@@ -7,6 +7,8 @@ import { readCustomer, rememberOrder, saveCustomer } from '../services/cache';
 import { watchLoyalty } from '../services/loyalty';
 import { discountForPoints, maxRedeemablePoints } from '../services/loyaltyMath';
 import { enableOrderAlerts } from '../services/notify';
+import { PaymentDetails } from '../components/PaymentDetails';
+import { compressPaymentProof, extractPaymentReference } from '../services/paymentProof';
 import { placeOrder } from '../services/store';
 import { money } from '../utils/pricing';
 
@@ -28,7 +30,11 @@ export function CheckoutPage() {
   const [orderType, setOrderType] = useState('takeaway');
   const [serveAtTable, setServeAtTable] = useState(true);
   const [seatingNote, setSeatingNote] = useState('');
+  const [orderNotes, setOrderNotes] = useState('');
   const [reference, setReference] = useState('');
+  const [proofPreview, setProofPreview] = useState('');
+  const [proofDataUrl, setProofDataUrl] = useState('');
+  const [scanning, setScanning] = useState(false);
   const [balance, setBalance] = useState(0);
   const [redeemInput, setRedeemInput] = useState(0);
   useEffect(() => {
@@ -44,11 +50,51 @@ export function CheckoutPage() {
   const [error, setError] = useState('');
   const [submitting, setSubmitting] = useState(false);
 
+  async function onProofSelected(event) {
+    const file = event.target.files?.[0];
+    event.target.value = '';
+    if (!file) return;
+    if (!file.type.startsWith('image/')) {
+      setError('Upload a screenshot image of your payment.');
+      return;
+    }
+    setError('');
+    setScanning(true);
+    if (proofPreview.startsWith('blob:')) URL.revokeObjectURL(proofPreview);
+    setProofPreview(URL.createObjectURL(file));
+    try {
+      const [stored, found] = await Promise.all([
+        compressPaymentProof(file),
+        extractPaymentReference(file),
+      ]);
+      setProofDataUrl(stored);
+      if (found) setReference(found);
+      else setError('Could not read a reference ID from that image. Check the screenshot or type the reference yourself.');
+    } catch (err) {
+      console.error(err);
+      setProofDataUrl('');
+      setProofPreview('');
+      setError(err?.message || 'Could not read that payment screenshot.');
+    } finally {
+      setScanning(false);
+    }
+  }
+
+  function clearProof() {
+    if (proofPreview.startsWith('blob:')) URL.revokeObjectURL(proofPreview);
+    setProofPreview('');
+    setProofDataUrl('');
+  }
+
   async function submit(event) {
     event.preventDefault();
     if (!business || cart.lines.length === 0) return;
     if (name.trim().length < 2 || phone.trim().length < 7 || reference.trim().length < 3) {
       setError('Enter your name, phone number, and the payment reference.');
+      return;
+    }
+    if (!proofDataUrl) {
+      setError('Upload a payment screenshot so we can verify your transfer.');
       return;
     }
     if (orderType === 'dineIn' && serveAtTable && seatingNote.trim().length < 3) {
@@ -68,13 +114,16 @@ export function CheckoutPage() {
         phone,
         orderType,
         paymentReference: reference,
+        orderNotes,
+        paymentProofUrl: proofDataUrl,
         seatingNote: orderType === 'dineIn' && serveAtTable ? seatingNote.trim() : '',
         dineInPickup: orderType === 'dineIn' && !serveAtTable,
         slug,
         notify,
         pointsRedeemed,
       });
-      rememberOrder(slug, identityNow, { ...placed, createdAt: Date.now() });
+      const { paymentProofUrl: _proof, ...remembered } = placed;
+      rememberOrder(slug, identityNow, { ...remembered, createdAt: Date.now() });
       cart.clear();
       navigate(`/b/${slug}/order/${placed.id}`);
     } catch (err) {
@@ -126,14 +175,36 @@ export function CheckoutPage() {
           )}
         </div>
       ) : null}
-      <div className="mt-4 rounded-3xl bg-white p-4">
-        <p className="font-semibold">{business?.paymentInstructions || 'Pay first'}</p>
-        <p className="mt-2 text-lg font-bold">{business?.paymentAccountNumber}</p>
-        <p className="text-sm">{business?.paymentAccountName}</p>
+      <label className="mt-4 block text-sm font-semibold">Order notes
+        <textarea
+          className="mt-1 w-full rounded-2xl border border-stone-200 px-3 py-3 font-normal"
+          rows={3}
+          value={orderNotes}
+          onChange={(event) => setOrderNotes(event.target.value)}
+          placeholder="Any note about the order? Allergies, less spice, cutlery, timing…"
+          maxLength={500}
+        />
+      </label>
+      <PaymentDetails business={business} className="mt-4" />
+      <div className="mt-3 rounded-3xl bg-white p-4">
+        <p className="text-sm font-semibold">Payment screenshot</p>
+        <p className="mt-1 text-sm text-stone-600">Upload the transfer receipt. We read the reference ID with OCR and save the image with your order.</p>
+        <label className="mt-3 flex cursor-pointer items-center justify-center rounded-2xl border border-dashed border-stone-300 bg-stone-50 px-3 py-4 text-sm font-semibold text-brand">
+          <input className="hidden" type="file" accept="image/*" capture="environment" onChange={onProofSelected} disabled={scanning || submitting} />
+          {scanning ? 'Reading screenshot…' : proofDataUrl ? 'Replace screenshot' : 'Upload payment screenshot'}
+        </label>
+        {proofPreview ? (
+          <div className="mt-3 overflow-hidden rounded-2xl border border-stone-200">
+            <img src={proofPreview || proofDataUrl} alt="Payment screenshot preview" className="max-h-56 w-full object-contain bg-stone-100" />
+            <button type="button" className="w-full py-2 text-sm font-semibold text-red-600" onClick={clearProof} disabled={scanning || submitting}>Remove</button>
+          </div>
+        ) : null}
       </div>
-      <label className="mt-3 block text-sm font-semibold">Payment reference<input className="mt-1 w-full rounded-2xl border border-stone-200 px-3 py-3" value={reference} onChange={(event) => setReference(event.target.value)} /></label>
+      <label className="mt-3 block text-sm font-semibold">Payment reference
+        <input className="mt-1 w-full rounded-2xl border border-stone-200 px-3 py-3" value={reference} onChange={(event) => setReference(event.target.value)} placeholder="Filled from your screenshot when possible" />
+      </label>
       {error ? <p className="mt-3 text-sm text-red-600">{error}</p> : null}
-      <button type="submit" disabled={submitting || cart.lines.length === 0} className="mt-5 w-full rounded-full bg-brand py-4 font-semibold text-white disabled:opacity-60">{submitting ? 'Placing order…' : 'Place order'}</button>
+      <button type="submit" disabled={submitting || scanning || cart.lines.length === 0} className="mt-5 w-full rounded-full bg-brand py-4 font-semibold text-white disabled:opacity-60">{submitting ? 'Placing order…' : 'Place order'}</button>
     </form>
   );
 }

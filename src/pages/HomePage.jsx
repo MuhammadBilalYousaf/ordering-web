@@ -57,6 +57,12 @@ export function HomePage() {
           <p className="mt-1 text-lg font-bold">{business.paymentAccountName}</p>
           <p>{business.paymentAccountNumber}</p>
           <p className="text-sm text-stone-600">{business.paymentInstructions}</p>
+          {business.paymentQrUrl ? (
+            <div className="mt-4 overflow-hidden rounded-2xl border border-orange-100 bg-white p-3">
+              <p className="text-sm font-semibold text-stone-700">Scan to pay</p>
+              <img src={business.paymentQrUrl} alt="Payment QR code" className="mx-auto mt-2 max-h-52 w-full object-contain" />
+            </div>
+          ) : null}
         </div>
       </div>
     </div>

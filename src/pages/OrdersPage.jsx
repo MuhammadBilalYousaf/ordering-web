@@ -241,11 +241,47 @@ export function OrderPage() {
       {order.orderType === 'dineIn' ? (
         <p className="mt-4 text-sm text-stone-600">{order.dineInPickup ? 'When it is ready, collect it from the shop and give this order number.' : `We will bring it to: ${order.seatingNote || 'your seat'}`}</p>
       ) : null}
+      {order.orderNotes ? <p className="mt-4 text-sm text-stone-600">Your notes: {order.orderNotes}</p> : null}
+      <StaffNotes comments={order.staffComments} />
       <p className="mt-4 text-sm text-stone-500">Payment: {statusLabels[order.paymentStatus] || order.paymentStatus}</p>
+      {order.paymentReference ? <p className="mt-1 text-sm text-stone-500">Reference: {order.paymentReference}</p> : null}
       <p className="mt-2 text-right text-lg font-bold">{money(order.total)}</p>
       {order.loyaltyDiscount > 0 ? <p className="text-right text-sm text-brand">Loyalty discount -{money(order.loyaltyDiscount)} ({order.pointsRedeemed} points)</p> : null}
       {earnedPoints > 0 ? <p className="text-right text-sm text-green-700">Loyalty earned +{earnedPoints} points</p> : null}
       <Link to={`/b/${slug}/orders`} className="mt-4 block text-center font-semibold text-brand">All orders</Link>
     </div>
   );
+}
+
+function StaffNotes({ comments }) {
+  const list = (Array.isArray(comments) ? comments : [])
+    .map((item) => ({
+      id: item?.id || `${item?.createdAt || ''}-${item?.text || ''}`,
+      text: String(item?.text || '').trim(),
+      authorName: String(item?.authorName || 'Staff').trim() || 'Staff',
+      createdAt: item?.createdAt,
+    }))
+    .filter((item) => item.text)
+    .sort((a, b) => String(b.createdAt || '').localeCompare(String(a.createdAt || '')));
+  if (list.length === 0) return null;
+  return (
+    <div className="mt-4 rounded-3xl bg-white p-4 shadow-md shadow-stone-300/40">
+      <p className="font-semibold">Notes from the shop</p>
+      <p className="mt-1 text-sm text-stone-500">Updates passed by staff for this order.</p>
+      <div className="mt-3 grid gap-2">
+        {list.map((item) => (
+          <div key={item.id} className="rounded-2xl bg-orange-50 px-3 py-3">
+            <p className="text-sm font-medium text-stone-800">{item.text}</p>
+            <p className="mt-1 text-xs text-stone-500">{item.authorName}{item.createdAt ? ` · ${formatStaffNoteTime(item.createdAt)}` : ''}</p>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+function formatStaffNoteTime(value) {
+  const date = value?.toDate ? value.toDate() : new Date(value);
+  if (Number.isNaN(date.getTime())) return '';
+  return date.toLocaleString(undefined, { dateStyle: 'medium', timeStyle: 'short' });
 }
