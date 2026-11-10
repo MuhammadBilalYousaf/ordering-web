@@ -3,6 +3,8 @@ import { Link } from 'react-router-dom';
 import { useBusiness } from '../context/BusinessContext';
 import { useCart } from '../context/CartContext';
 import { isGuest, loadCustomer, watchAuth } from '../services/auth';
+import { FeedbackCarousel } from '../components/FeedbackCarousel';
+import { PageSkeleton } from '../components/Skeleton';
 import { money } from '../utils/pricing';
 
 export function HomePage() {
@@ -28,16 +30,17 @@ export function HomePage() {
   }, [user]);
   const signedIn = user && !isGuest(user);
   if (error) return <p className="p-6 text-center">{error}</p>;
-  if (business === undefined) return <p className="p-8 text-center">Loading…</p>;
+  if (business === undefined) return <PageSkeleton cards={2} />;
   if (!business) return <p className="p-8 text-center">This restaurant link is not active.</p>;
   return (
     <div>
-      <header className="bg-ink px-5 pb-8 pt-8 text-white">
+      <header className="bg-ink px-5 pb-8 pt-8 text-white md:mx-6 md:mt-6 md:rounded-3xl md:px-10 md:py-12">
         <p className="text-xs uppercase tracking-[0.2em] text-orange-200">Welcome</p>
-        <h1 className="mt-2 text-3xl font-bold">{business.name}</h1>
-        <p className="mt-2 max-w-sm text-sm text-stone-300">Order as a guest, or sign in so repeat visits can earn discounts later.</p>
+        <h1 className="mt-2 text-3xl font-bold md:text-5xl">{business.name}</h1>
+        <p className="mt-2 max-w-lg text-sm text-stone-300">Order as a guest, or sign in so repeat visits can earn discounts later.</p>
       </header>
-      <div className="-mt-4 grid gap-3 px-4">
+      <FeedbackCarousel businessId={business.businessId} />
+      <div className="-mt-4 grid gap-3 px-4 md:mt-6 md:grid-cols-3 md:px-6">
         <Link to={`/b/${slug}/menu`} className="card-pop rounded-3xl bg-white p-5 shadow-sm">
           <p className="text-sm text-stone-500">Start here</p>
           <p className="text-xl font-bold">Browse the menu</p>

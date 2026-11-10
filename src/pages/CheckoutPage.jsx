@@ -9,6 +9,7 @@ import { discountForPoints, maxRedeemablePoints } from '../services/loyaltyMath'
 import { enableOrderAlerts } from '../services/notify';
 import { PaymentDetails } from '../components/PaymentDetails';
 import { compressPaymentProof, extractPaymentReference } from '../services/paymentProof';
+import { cashOnDeliveryEnabled, checkoutPaymentError } from '../services/paymentChoice';
 import { placeOrder } from '../services/store';
 import { money } from '../utils/pricing';
 
@@ -28,6 +29,7 @@ export function CheckoutPage() {
     setPhone(cached.phone);
   }, [user, slug]);
   const [orderType, setOrderType] = useState('takeaway');
+  const [payMethod, setPayMethod] = useState('prepaid');
   const [serveAtTable, setServeAtTable] = useState(true);
   const [seatingNote, setSeatingNote] = useState('');
   const [orderNotes, setOrderNotes] = useState('');
@@ -89,16 +91,20 @@ export function CheckoutPage() {
   async function submit(event) {
     event.preventDefault();
     if (!business || cart.lines.length === 0) return;
-    if (name.trim().length < 2 || phone.trim().length < 7 || reference.trim().length < 3) {
-      setError('Enter your name, phone number, and the payment reference.');
-      return;
-    }
-    if (!proofDataUrl) {
-      setError('Upload a payment screenshot so we can verify your transfer.');
-      return;
-    }
-    if (orderType === 'dineIn' && serveAtTable && seatingNote.trim().length < 3) {
-      setError('Tell us your table number or where you are sitting so we can bring the order.');
+    const codEnabled = cashOnDeliveryEnabled(business);
+    const method = codEnabled && payMethod === 'cod' ? 'cod' : 'prepaid';
+    const paymentError = checkoutPaymentError({
+      codEnabled,
+      method,
+      name,
+      phone,
+      reference,
+      hasProof: Boolean(proofDataUrl),
+      dineInNeedsSeat: orderType === 'dineIn' && serveAtTable,
+      seatingNote,
+    });
+    if (paymentError) {
+      setError(paymentError);
       return;
     }
     setSubmitting(true);
@@ -121,6 +127,7 @@ export function CheckoutPage() {
         slug,
         notify,
         pointsRedeemed,
+        paymentMethod: method === 'cod' ? 'cod' : 'manual',
       });
       const { paymentProofUrl: _proof, ...remembered } = placed;
       rememberOrder(slug, identityNow, { ...remembered, createdAt: Date.now() });
@@ -185,13 +192,25 @@ export function CheckoutPage() {
           maxLength={500}
         />
       </label>
+      {cashOnDeliveryEnabled(business) ? (
+        <div className="mt-4 grid grid-cols-2 gap-2">
+          <button type="button" className={`rounded-2xl border py-3 text-sm font-semibold ${payMethod === 'cod' ? 'border-brand bg-orange-50' : 'border-stone-200 bg-white'}`} onClick={() => setPayMethod('cod')}>Cash on Delivery</button>
+          <button type="button" className={`rounded-2xl border py-3 text-sm font-semibold ${payMethod !== 'cod' ? 'border-brand bg-orange-50' : 'border-stone-200 bg-white'}`} onClick={() => setPayMethod('prepaid')}>Prepaid (EasyPaisa / JazzCash)</button>
+        </div>
+      ) : (
+        <p className="mt-4 text-sm font-semibold">Prepaid (EasyPaisa / JazzCash)</p>
+      )}
+      {payMethod === 'cod' && cashOnDeliveryEnabled(business) ? (
+        <p className="mt-3 rounded-3xl bg-orange-50 p-4 text-sm">Pay cash when you collect or receive the order. No transfer is needed now.</p>
+      ) : (
+        <>
       <PaymentDetails business={business} className="mt-4" />
       <div className="mt-3 rounded-3xl bg-white p-4">
-        <p className="text-sm font-semibold">Payment screenshot</p>
-        <p className="mt-1 text-sm text-stone-600">Upload the transfer receipt. We read the reference ID with OCR and save the image with your order.</p>
+        <p className="text-sm font-semibold">Payment screenshot (optional)</p>
+        <p className="mt-1 text-sm text-stone-600">You can type the reference, or upload a screenshot and we will try to read it. The reference is what we need.</p>
         <label className="mt-3 flex cursor-pointer items-center justify-center rounded-2xl border border-dashed border-stone-300 bg-stone-50 px-3 py-4 text-sm font-semibold text-brand">
           <input className="hidden" type="file" accept="image/*" capture="environment" onChange={onProofSelected} disabled={scanning || submitting} />
-          {scanning ? 'Reading screenshot…' : proofDataUrl ? 'Replace screenshot' : 'Upload payment screenshot'}
+          {scanning ? 'Reading screenshot…' : proofDataUrl ? 'Replace screenshot' : 'Upload screenshot to fill the reference'}
         </label>
         {proofPreview ? (
           <div className="mt-3 overflow-hidden rounded-2xl border border-stone-200">
@@ -203,6 +222,8 @@ export function CheckoutPage() {
       <label className="mt-3 block text-sm font-semibold">Payment reference
         <input className="mt-1 w-full rounded-2xl border border-stone-200 px-3 py-3" value={reference} onChange={(event) => setReference(event.target.value)} placeholder="Filled from your screenshot when possible" />
       </label>
+        </>
+      )}
       {error ? <p className="mt-3 text-sm text-red-600">{error}</p> : null}
       <button type="submit" disabled={submitting || scanning || cart.lines.length === 0} className="mt-5 w-full rounded-full bg-brand py-4 font-semibold text-white disabled:opacity-60">{submitting ? 'Placing order…' : 'Place order'}</button>
     </form>

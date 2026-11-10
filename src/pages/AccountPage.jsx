@@ -2,12 +2,13 @@ import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { useBusiness } from '../context/BusinessContext';
 import { awardCompletedOrders, watchLoyalty, watchLoyaltyActivity } from '../services/loyalty';
-import { continueAsGuest, isGuest, loadCustomer, signInCustomer, signOutCustomer, signUpCustomer, watchAuth } from '../services/auth';
+import { continueAsGuest, isGuest, loadCustomer, sendCustomerPasswordReset, signInCustomer, signOutCustomer, signUpCustomer, watchAuth } from '../services/auth';
 
 export function AccountPage() {
   const { slug, business } = useBusiness();
   const [user, setUser] = useState(undefined);
   const [mode, setMode] = useState('signin');
+  const [resetSent, setResetSent] = useState(false);
   const [name, setName] = useState('');
   const [email, setEmail] = useState('');
   const [phone, setPhone] = useState('');
@@ -52,7 +53,13 @@ export function AccountPage() {
       await action();
     } catch (err) {
       console.error(err);
-      setError(err.code === 'auth/email-already-in-use' ? 'That email already has an account. Sign in instead.' : 'That did not work. Check the email and password.');
+      const known = {
+        'auth/email-already-in-use': 'That email already has an account. Sign in instead.',
+        'auth/invalid-email': 'Enter a valid email address.',
+        'auth/user-not-found': 'No account uses that email.',
+        'auth/missing-email': 'Enter the email on your account.',
+      };
+      setError(known[err.code] || err.message || 'That did not work. Check the email and password.');
     } finally {
       setBusy(false);
     }
@@ -131,8 +138,19 @@ export function AccountPage() {
         <input className="rounded-2xl border px-3 py-3" placeholder="Email" value={email} onChange={(event) => setEmail(event.target.value)} />
         {mode === 'signup' ? <input className="rounded-2xl border px-3 py-3" placeholder="Phone" value={phone} onChange={(event) => setPhone(event.target.value)} /> : null}
         <input className="rounded-2xl border px-3 py-3" placeholder="Password" type="password" value={password} onChange={(event) => setPassword(event.target.value)} />
+        {mode === 'signin' ? (
+          <button type="button" className="text-left text-sm font-semibold text-brand" onClick={() => {
+            setResetSent(false);
+            setError('');
+            run(async () => {
+              await sendCustomerPasswordReset(email);
+              setResetSent(true);
+            });
+          }}>{busy ? 'Sending reset email…' : 'Forgot password?'}</button>
+        ) : null}
+        {resetSent ? <p className="rounded-2xl bg-orange-50 px-3 py-3 text-sm text-brand">Check that inbox for a link to choose a new password.</p> : null}
         {error ? <p className="text-sm text-red-600">{error}</p> : null}
-        <button disabled={busy} className="rounded-full bg-brand py-3 font-semibold text-white disabled:opacity-60">{busy ? 'Please wait…' : mode === 'signup' ? 'Create account' : 'Sign in'}</button>
+        <button disabled={busy} className="rounded-full bg-brand py-3 font-semibold text-white transition active:scale-[0.98] disabled:opacity-60">{busy ? 'Please wait…' : mode === 'signup' ? 'Create account' : 'Sign in'}</button>
       </form>
       <button type="button" className="mt-3 w-full rounded-full border border-stone-300 py-3 font-semibold" onClick={() => run(continueAsGuest)}>Continue as guest</button>
     </div>

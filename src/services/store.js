@@ -43,7 +43,7 @@ export function watchMyOrders(uid, email, onData, onError) {
   }, () => onError('Your orders could not be loaded.'));
 }
 
-export async function placeOrder({ business, cart, customerName, phone, orderType, paymentReference, orderNotes = '', paymentProofUrl = '', seatingNote = '', dineInPickup = false, slug = '', notify = null, pointsRedeemed = 0 }) {
+export async function placeOrder({ business, cart, customerName, phone, orderType, paymentReference, orderNotes = '', paymentProofUrl = '', seatingNote = '', dineInPickup = false, slug = '', notify = null, pointsRedeemed = 0, paymentMethod = 'manual' }) {
   const credential = auth.currentUser ? { user: auth.currentUser } : await signInAnonymously(auth);
   const user = credential.user;
   try {
@@ -86,9 +86,9 @@ export async function placeOrder({ business, cart, customerName, phone, orderTyp
     loyaltyPointsEarned: 0,
     total,
     orderNotes: String(orderNotes || '').trim(),
-    paymentMethod: 'manual',
-    paymentReference: paymentReference.trim(),
-    paymentProofUrl: String(paymentProofUrl || '').trim(),
+    paymentMethod: paymentMethod === 'cod' ? 'cod' : 'manual',
+    paymentReference: paymentMethod === 'cod' ? '' : paymentReference.trim(),
+    paymentProofUrl: paymentMethod === 'cod' ? '' : String(paymentProofUrl || '').trim(),
     paymentStatus: 'PENDING_PAYMENT_VERIFICATION',
     orderStatus: 'PENDING_PAYMENT_VERIFICATION',
     orderNumber,

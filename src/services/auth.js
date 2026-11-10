@@ -4,6 +4,7 @@ import {
   linkWithCredential,
   onAuthStateChanged,
   signInAnonymously,
+  sendPasswordResetEmail,
   signInWithEmailAndPassword,
   signOut,
   updateProfile,
@@ -58,6 +59,12 @@ export async function signUpCustomer({ name, email, password, phone }) {
     console.error(error);
   }
   return user;
+}
+
+export async function sendCustomerPasswordReset(email) {
+  const address = String(email || '').trim();
+  if (!address.includes('@')) throw Object.assign(new Error('Enter the email on your account.'), { code: 'auth/invalid-email' });
+  await sendPasswordResetEmail(auth, address);
 }
 
 export async function signInCustomer({ email, password }) {

@@ -1,10 +1,14 @@
 import { useEffect, useRef, useState } from 'react';
-import { Link, useParams } from 'react-router-dom';
+import { Link, useNavigate, useParams } from 'react-router-dom';
 import { useBusiness } from '../context/BusinessContext';
+import { useCart } from '../context/CartContext';
 import { isGuest, watchAuth } from '../services/auth';
 import { readCustomer, updateSavedOrder } from '../services/cache';
 import { syncOrderLoyalty, watchOrderEarn } from '../services/loyalty';
 import { watchMyOrders, watchOrder } from '../services/store';
+import { PageSkeleton } from '../components/Skeleton';
+import { saveOrderFeedback, watchOrderFeedback } from '../services/feedback';
+import { planReorder } from '../services/reorder';
 import { money } from '../utils/pricing';
 import { statusLabels, steps } from '../utils/status';
 
@@ -37,11 +41,11 @@ export function OrdersPage() {
       });
     }, () => {});
   }, [signedIn, user]);
-  if (user === undefined) return <p className="p-8 text-center">Loading orders…</p>;
+  if (user === undefined) return <PageSkeleton />;
   const saved = readCustomer(slug, signedIn ? user : null);
   const email = signedIn ? user.email.trim().toLowerCase() : '';
   const localOrders = signedIn
-    ? saved.orders.filter((order) => !order.customerEmail || String(order.customerEmail).toLowerCase() === email)
+    ? saved.orders.filter((order) => order.customerKind !== 'guest' && String(order.customerEmail || '').toLowerCase() === email)
     : saved.orders;
   const byId = new Map(signedIn ? [] : localOrders.map((order) => [order.id, order]));
   if (signedIn) {
@@ -159,6 +163,8 @@ function savedOrder(slug, orderId, user) {
 
 export function OrderPage() {
   const { slug, menu } = useBusiness();
+  const cart = useCart();
+  const navigate = useNavigate();
   const { orderId } = useParams();
   const [user, setUser] = useState(undefined);
   const [order, setOrder] = useState(undefined);
@@ -209,7 +215,7 @@ export function OrderPage() {
     if (!order?.businessId || !order?.customerUid || !order?.id) return undefined;
     return watchOrderEarn(order.businessId, order.customerUid, order.id, setEarnedPoints);
   }, [order?.businessId, order?.customerUid, order?.id]);
-  if (!order && user === undefined) return <p className="p-8 text-center">Loading your order…</p>;
+  if (!order && user === undefined) return <PageSkeleton cards={4} />;
   if (!order) return <p className="p-6">{error || 'Order not found on this phone.'}</p>;
   const active = steps.indexOf(order.orderStatus);
   return (
@@ -248,8 +254,79 @@ export function OrderPage() {
       <p className="mt-2 text-right text-lg font-bold">{money(order.total)}</p>
       {order.loyaltyDiscount > 0 ? <p className="text-right text-sm text-brand">Loyalty discount -{money(order.loyaltyDiscount)} ({order.pointsRedeemed} points)</p> : null}
       {earnedPoints > 0 ? <p className="text-right text-sm text-green-700">Loyalty earned +{earnedPoints} points</p> : null}
+      <button type="button" className="mt-4 w-full rounded-full bg-ink py-3 font-semibold text-white transition active:scale-[0.98]" onClick={() => {
+        const plan = planReorder(menu, order.items);
+        plan.lines.forEach((line) => cart.addLine(line));
+        const detail = [...plan.notes, ...plan.skipped.map((item) => `${item.name}: ${item.reason}`)].join('\n');
+        if (plan.lines.length === 0) {
+          window.alert(detail || 'Nothing from this order is on the menu now.');
+          return;
+        }
+        if (detail) window.alert(detail);
+        navigate(`/b/${slug}/cart`);
+      }}>Reorder</button>
+      <OrderFeedback order={order} user={user} />
       <Link to={`/b/${slug}/orders`} className="mt-4 block text-center font-semibold text-brand">All orders</Link>
     </div>
+  );
+}
+
+function OrderFeedback({ order, user }) {
+  const [existing, setExisting] = useState(undefined);
+  const [rating, setRating] = useState(0);
+  const [comment, setComment] = useState('');
+  const [editing, setEditing] = useState(false);
+  const [busy, setBusy] = useState(false);
+  const [message, setMessage] = useState('');
+  useEffect(() => watchOrderFeedback(order.id, (value) => {
+    setExisting(value);
+    if (value && !editing) {
+      setRating(value.rating || 0);
+      setComment(value.comment || '');
+    }
+  }), [order.id, editing]);
+  if (order.orderStatus !== 'COMPLETED') return null;
+  if (user === undefined || existing === undefined) return <PageSkeleton cards={1} />;
+  const signedIn = user && !isGuest(user);
+  if (!signedIn) {
+    return <p className="mt-4 text-sm text-stone-500">Sign in with the account that placed this order to leave feedback.</p>;
+  }
+  if (existing && !editing) {
+    return (
+      <div className="mt-4 rounded-3xl bg-white p-4 shadow-sm">
+        <p className="font-semibold">Your feedback</p>
+        <p className="mt-1 text-sm text-brand">{'★'.repeat(existing.rating || 0)}{'☆'.repeat(Math.max(0, 5 - (existing.rating || 0)))}</p>
+        {existing.comment ? <p className="mt-2 text-sm">{existing.comment}</p> : null}
+        <p className="mt-2 text-xs text-stone-500">{existing.status === 'reviewed' ? 'Reviewed by the shop' : 'Sent to the shop'}</p>
+        <button type="button" className="mt-3 text-sm font-semibold text-brand" onClick={() => setEditing(true)}>Edit feedback</button>
+      </div>
+    );
+  }
+  return (
+    <form className="mt-4 rounded-3xl bg-white p-4 shadow-sm" onSubmit={async (event) => {
+      event.preventDefault();
+      setBusy(true);
+      setMessage('');
+      try {
+        await saveOrderFeedback({ order, user, rating, comment, existing });
+        setEditing(false);
+        setMessage(existing ? 'Feedback updated.' : 'Feedback sent.');
+      } catch (error) {
+        setMessage(error.message || 'Feedback could not be saved.');
+      } finally {
+        setBusy(false);
+      }
+    }}>
+      <p className="font-semibold">{existing ? 'Edit feedback' : 'How was this order?'}</p>
+      <div className="mt-2 flex gap-2">
+        {[1, 2, 3, 4, 5].map((score) => (
+          <button key={score} type="button" className={`h-10 w-10 rounded-full text-sm font-bold transition ${rating === score ? 'bg-brand text-white' : 'bg-stone-100'}`} onClick={() => setRating(score)}>{score}</button>
+        ))}
+      </div>
+      <textarea className="mt-3 w-full rounded-2xl border border-stone-200 px-3 py-3 text-sm" rows={3} maxLength={500} value={comment} onChange={(event) => setComment(event.target.value)} placeholder="Optional comment for this order" />
+      {message ? <p className="mt-2 text-sm text-stone-600">{message}</p> : null}
+      <button disabled={busy} className="mt-3 w-full rounded-full bg-brand py-3 font-semibold text-white disabled:opacity-60">{busy ? 'Saving…' : existing ? 'Update feedback' : 'Send feedback'}</button>
+    </form>
   );
 }
 

@@ -43,6 +43,48 @@ body {
   animation: thumb 0.45s ease both;
 }
 
+.slide-left {
+  animation: slideLeft 0.45s ease;
+}
+
+.slide-right {
+  animation: slideRight 0.45s ease;
+}
+
+@keyframes slideLeft {
+  from { opacity: 0.4; transform: translateX(28px); }
+  to { opacity: 1; transform: none; }
+}
+
+@keyframes slideRight {
+  from { opacity: 0.4; transform: translateX(-28px); }
+  to { opacity: 1; transform: none; }
+}
+
+.skel {
+  background: linear-gradient(90deg, #efeae4 25%, #f8f5f1 37%, #efeae4 63%);
+  background-size: 400% 100%;
+  animation: shimmer 1.15s ease infinite;
+}
+
+@keyframes shimmer {
+  from { background-position: 100% 0; }
+  to { background-position: 0 0; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .page-enter,
+  .card-pop,
+  .sheet-enter,
+  .thumb-in,
+  .status-line,
+  .skel,
+  .slide-left,
+  .slide-right {
+    animation: none;
+  }
+}
+
 @keyframes thumb {
   from { opacity: 0; transform: scale(0.92); }
   to { opacity: 1; transform: none; }

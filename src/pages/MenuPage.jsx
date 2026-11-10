@@ -2,6 +2,7 @@ import { useMemo, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { useBusiness } from '../context/BusinessContext';
 import { useCart } from '../context/CartContext';
+import { MenuSkeleton } from '../components/Skeleton';
 import { money, unitPrice } from '../utils/pricing';
 
 export function MenuPage() {
@@ -9,11 +10,20 @@ export function MenuPage() {
   const cart = useCart();
   const [categoryId, setCategoryId] = useState(null);
   const [product, setProduct] = useState(null);
+  const [searchOpen, setSearchOpen] = useState(false);
+  const [query, setQuery] = useState('');
   if (error) return <p className="p-6">{error}</p>;
-  if (!business || !menu) return <p className="p-8 text-center">Loading menu…</p>;
+  if (!business || !menu) return <MenuSkeleton />;
   const categories = (menu.categories || []).filter((category) => category.active !== false);
   const selected = categories.find((category) => category.id === categoryId) || categories[0];
   const products = (selected?.products || []).filter((item) => item.available !== false);
+  const needle = query.trim().toLowerCase();
+  const matches = needle
+    ? categories.flatMap((category) => (category.products || [])
+      .filter((item) => item.available !== false)
+      .filter((item) => `${item.name} ${item.description || ''}`.toLowerCase().includes(needle))
+      .map((item) => ({ item, category })))
+    : [];
 
   function addProduct(item) {
     const needsChoice = (item.variants || []).length > 1 || (item.addons || []).length > 0;
@@ -38,42 +48,79 @@ export function MenuPage() {
 
   return (
     <div>
-      <header className="px-5 pb-2 pt-6">
-        <p className="text-sm text-stone-500">{business.name}</p>
-        <h1 className="text-2xl font-bold">Menu</h1>
+      <header className="flex items-end justify-between gap-3 px-4 pb-2 pt-5 md:px-6 md:pt-8">
+        <div>
+          <p className="text-sm text-stone-500 md:hidden">{business.name}</p>
+          <h1 className="text-2xl font-bold">Menu</h1>
+        </div>
+        <button type="button" className="rounded-full bg-ink px-4 py-2 text-sm font-semibold text-white shadow-sm transition hover:scale-[1.03]" onClick={() => setSearchOpen(true)}>Search</button>
       </header>
-      <div className="sticky top-0 z-10 flex gap-2 overflow-auto bg-[#f6f3ef] px-4 py-3">
+      <div className="sticky top-0 z-10 flex gap-2 overflow-auto bg-[#f6f3ef] px-4 py-3 md:top-14 md:px-6">
         {categories.map((category) => (
           <button key={category.id} type="button" className={`shrink-0 rounded-full px-4 py-2 text-sm font-semibold transition ${selected?.id === category.id ? 'bg-ink text-white' : 'bg-white'}`} onClick={() => setCategoryId(category.id)}>{category.name}</button>
         ))}
       </div>
-      <div className="grid grid-cols-1 gap-4 px-4 pb-24 sm:grid-cols-2">
-        {products.map((item, index) => {
-          const from = item.variants?.length ? Math.min(...item.variants.map((variant) => Number(variant.price) || 0)) : unitPrice(item, null, []).unit;
-          return (
-            <button key={item.id} type="button" style={{ animationDelay: `${index * 40}ms` }} className="card-pop group overflow-hidden rounded-3xl bg-white text-left shadow-md shadow-stone-300/70 transition duration-300 hover:-translate-y-1 hover:shadow-xl hover:shadow-stone-400/50" onClick={() => addProduct(item)}>
-              <div className="overflow-hidden bg-orange-50">
-                {item.imageUrl
-                  ? <img src={item.imageUrl} alt="" className="h-48 w-full object-cover transition duration-500 group-hover:scale-110" />
-                  : <div className="flex h-48 w-full items-center justify-center text-4xl transition duration-500 group-hover:scale-110">🍽️</div>}
-              </div>
-              <div className="flex items-center gap-3 p-4">
-                <div className="min-w-0 flex-1">
-                  <h2 className="text-lg font-bold leading-snug">{item.name}</h2>
-                  {item.description ? <p className="mt-1 text-sm leading-snug text-stone-500">{item.description}</p> : null}
-                </div>
-                <div className="flex shrink-0 flex-col items-end gap-2">
-                  <span className="text-base font-bold">{money(from)}</span>
-                  <span className="rounded-full bg-brand px-4 py-2 text-sm font-semibold text-white shadow-sm transition group-hover:scale-105">Add</span>
-                </div>
-              </div>
-            </button>
-          );
-        })}
+      <div className="grid grid-cols-3 gap-2 px-3 pb-24 sm:gap-3 sm:px-4 md:grid-cols-4 md:px-6 lg:grid-cols-5 xl:grid-cols-6">
+        {products.map((item, index) => (
+          <ProductCard key={item.id} item={item} index={index} onAdd={() => addProduct(item)} />
+        ))}
       </div>
-      {cart.count > 0 ? <Link to={`/b/${slug}/cart`} className="fixed bottom-20 left-1/2 z-10 w-[min(28rem,calc(100%-2rem))] -translate-x-1/2 rounded-full bg-brand px-5 py-3 text-center font-semibold text-white shadow-lg">View cart · {money(cart.subtotal)}</Link> : null}
+      {cart.count > 0 ? <Link to={`/b/${slug}/cart`} className="fixed bottom-16 left-1/2 z-10 w-[min(24rem,calc(100%-1.5rem))] -translate-x-1/2 rounded-full bg-brand px-5 py-2.5 text-center text-sm font-semibold text-white shadow-lg md:bottom-6">View cart · {money(cart.subtotal)}</Link> : null}
       {product ? <ProductSheet product={product} onClose={() => setProduct(null)} onAdd={(line) => { cart.addLine(line); setProduct(null); }} /> : null}
+      {searchOpen ? (
+        <div className="fixed inset-0 z-40 flex items-start justify-center bg-ink/40 p-3 md:p-10" onClick={() => setSearchOpen(false)}>
+          <div className="sheet-enter w-full max-w-lg rounded-3xl bg-white p-4 shadow-xl" onClick={(event) => event.stopPropagation()}>
+            <div className="flex items-center gap-2">
+              <input autoFocus value={query} onChange={(event) => setQuery(event.target.value)} placeholder="Search all categories" className="w-full rounded-2xl border border-stone-200 px-4 py-3 text-sm outline-none focus:border-brand" />
+              <button type="button" className="shrink-0 rounded-full px-3 py-2 text-sm font-semibold text-stone-500" onClick={() => { setQuery(''); setSearchOpen(false); }}>Close</button>
+            </div>
+            <div className="mt-3 max-h-[60vh] overflow-auto">
+              {!needle ? <p className="px-1 py-6 text-center text-sm text-stone-500">Type a dish name to search every category.</p> : null}
+              {needle && matches.length === 0 ? (
+                <div className="px-3 py-8 text-center">
+                  <p className="text-lg font-bold">Nothing matches “{query.trim()}”</p>
+                  <p className="mt-1 text-sm text-stone-500">Try another word. Search looks through every category.</p>
+                  <button type="button" className="mt-4 rounded-full bg-ink px-4 py-2 text-sm font-semibold text-white" onClick={() => setQuery('')}>Clear search</button>
+                </div>
+              ) : null}
+              {matches.map(({ item, category }) => (
+                <button key={`${category.id}-${item.id}`} type="button" className="flex w-full items-center gap-3 rounded-2xl px-2 py-2 text-left transition hover:bg-orange-50" onClick={() => { setSearchOpen(false); addProduct(item); }}>
+                  <span className="min-w-0 flex-1">
+                    <span className="block truncate font-semibold">{item.name}</span>
+                    <span className="block truncate text-xs text-stone-500">{category.name}</span>
+                  </span>
+                  <span className="text-sm font-bold">{money(fromPrice(item))}</span>
+                </button>
+              ))}
+            </div>
+          </div>
+        </div>
+      ) : null}
     </div>
+  );
+}
+
+function fromPrice(item) {
+  return item.variants?.length ? Math.min(...item.variants.map((variant) => Number(variant.price) || 0)) : unitPrice(item, null, []).unit;
+}
+
+function ProductCard({ item, index, onAdd }) {
+  return (
+    <button type="button" style={{ animationDelay: `${Math.min(index, 12) * 35}ms` }} className="card-pop group overflow-hidden rounded-2xl bg-white text-left shadow-md shadow-stone-300/60 transition duration-300 hover:-translate-y-1 hover:shadow-lg" onClick={onAdd}>
+      <div className="overflow-hidden bg-orange-50">
+        {item.imageUrl
+          ? <img src={item.imageUrl} alt="" className="aspect-square w-full object-cover transition duration-500 group-hover:scale-105 md:aspect-[4/3] md:max-h-40" />
+          : <div className="flex aspect-square w-full items-center justify-center text-2xl md:aspect-[4/3] md:max-h-40 md:text-4xl">🍽️</div>}
+      </div>
+      <div className="p-2 md:p-3">
+        <h2 className="line-clamp-2 text-xs font-bold leading-snug md:text-sm">{item.name}</h2>
+        {item.description ? <p className="mt-1 hidden text-xs leading-snug text-stone-500 md:line-clamp-2 md:block">{item.description}</p> : null}
+        <div className="mt-1.5 flex items-center justify-between gap-1">
+          <span className="text-xs font-bold md:text-sm">{money(fromPrice(item))}</span>
+          <span className="rounded-full bg-brand px-2 py-1 text-[10px] font-semibold text-white md:px-3 md:text-xs">Add</span>
+        </div>
+      </div>
+    </button>
   );
 }
 
@@ -83,8 +130,8 @@ function ProductSheet({ product, onClose, onAdd }) {
   const [quantity, setQuantity] = useState(1);
   const priced = useMemo(() => unitPrice(product, variantId, addonIds), [product, variantId, addonIds]);
   return (
-    <div className="fixed inset-0 z-30 flex items-end bg-ink/40" onClick={onClose}>
-      <div className="sheet-enter max-h-[88vh] w-full overflow-auto rounded-t-3xl bg-white p-5" onClick={(event) => event.stopPropagation()}>
+    <div className="fixed inset-0 z-30 flex items-end bg-ink/40 md:items-center md:justify-center md:p-8" onClick={onClose}>
+      <div className="sheet-enter max-h-[88vh] w-full overflow-auto rounded-t-3xl bg-white p-5 md:max-w-lg md:rounded-3xl" onClick={(event) => event.stopPropagation()}>
         {product.imageUrl ? <img src={product.imageUrl} alt="" className="mb-3 h-44 w-full rounded-2xl object-cover" /> : null}
         <h2 className="text-xl font-bold">{product.name}</h2>
         {product.description ? <p className="mt-1 text-sm text-stone-500">{product.description}</p> : null}
