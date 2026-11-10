@@ -57,6 +57,7 @@ export async function placeOrder({ business, cart, customerName, phone, orderTyp
     imageUrl: line.imageUrl || '',
     variantId: line.variantId || null,
     variantName: line.variantName || null,
+    flavors: (line.flavors || []).map((flavor) => ({ id: flavor.id, name: flavor.name })),
     addons: line.addons,
     quantity: line.quantity,
     unitPrice: line.unitPrice,

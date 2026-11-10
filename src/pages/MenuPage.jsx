@@ -26,7 +26,7 @@ export function MenuPage() {
     : [];
 
   function addProduct(item) {
-    const needsChoice = (item.variants || []).length > 1 || (item.addons || []).length > 0;
+    const needsChoice = (item.variants || []).length > 1 || (item.addons || []).length > 0 || (item.flavors || []).length > 0;
     if (needsChoice) {
       setProduct(item);
       return;
@@ -124,11 +124,26 @@ function ProductCard({ item, index, onAdd }) {
   );
 }
 
+function scoopCount(variant) {
+  const set = Number(variant?.scoops);
+  if (set > 1) return set;
+  const name = String(variant?.name || '').toLowerCase();
+  if (name.includes('triple') || name.includes('three')) return 3;
+  if (name.includes('double') || name.includes('two')) return 2;
+  return Math.max(1, set || 1);
+}
+
 function ProductSheet({ product, onClose, onAdd }) {
+  const flavors = (product.flavors || []).filter((flavor) => flavor.name.trim().toLowerCase() !== product.name.trim().toLowerCase());
   const [variantId, setVariantId] = useState(product.variants?.[0]?.id || null);
   const [addonIds, setAddonIds] = useState([]);
+  const [flavorIds, setFlavorIds] = useState([]);
   const [quantity, setQuantity] = useState(1);
+  const [choiceError, setChoiceError] = useState('');
   const priced = useMemo(() => unitPrice(product, variantId, addonIds), [product, variantId, addonIds]);
+  const selectedVariant = (product.variants || []).find((item) => item.id === variantId) || product.variants?.[0] || null;
+  const scoops = flavors.length ? scoopCount(selectedVariant) : 1;
+  const extraScoops = Math.max(0, scoops - 1);
   return (
     <div className="fixed inset-0 z-30 flex items-end bg-ink/40 md:items-center md:justify-center md:p-8" onClick={onClose}>
       <div className="sheet-enter max-h-[88vh] w-full overflow-auto rounded-t-3xl bg-white p-5 md:max-w-lg md:rounded-3xl" onClick={(event) => event.stopPropagation()}>
@@ -141,29 +156,56 @@ function ProductSheet({ product, onClose, onAdd }) {
               {variant.name}<span className="float-right">{money(variant.price)}</span>
             </button>
           ))}
+          {extraScoops > 0 ? <p className="text-sm text-stone-500">Scoop 1 is {product.name}. Choose the other scoop{extraScoops > 1 ? 's' : ''}.</p> : null}
+          {extraScoops > 0 ? Array.from({ length: extraScoops }, (_, index) => (
+            <label key={index} className="block text-sm font-semibold">Scoop {index + 2}
+              <select className="mt-1 w-full rounded-2xl border border-stone-200 bg-white px-3 py-3 font-normal" value={flavorIds[index] || ''} onChange={(event) => setFlavorIds((current) => {
+                const next = [...current];
+                next[index] = event.target.value;
+                return next;
+              })}>
+                <option value="">Choose a flavor</option>
+                {flavors.map((flavor) => <option key={flavor.id} value={flavor.id}>{flavor.name}</option>)}
+              </select>
+            </label>
+          )) : null}
           {(product.addons || []).map((addon) => (
             <button key={addon.id} type="button" className={`rounded-2xl border px-3 py-3 text-left transition ${addonIds.includes(addon.id) ? 'border-brand bg-orange-50' : 'border-stone-200'}`} onClick={() => setAddonIds((current) => current.includes(addon.id) ? current.filter((id) => id !== addon.id) : [...current, addon.id])}>
               {addon.name}<span className="float-right">+{money(addon.price)}</span>
             </button>
           ))}
         </div>
+        {choiceError ? <p className="mt-3 text-sm text-red-600">{choiceError}</p> : null}
         <div className="mt-5 flex items-center justify-between">
           <div className="flex items-center gap-3">
             <button type="button" className="h-10 w-10 rounded-full bg-stone-100" onClick={() => setQuantity((value) => Math.max(1, value - 1))}>−</button>
             <span className="w-6 text-center font-semibold">{quantity}</span>
             <button type="button" className="h-10 w-10 rounded-full bg-stone-100" onClick={() => setQuantity((value) => value + 1)}>+</button>
           </div>
-          <button type="button" className="rounded-full bg-brand px-5 py-3 font-semibold text-white" onClick={() => onAdd({
-            key: [product.id, variantId || '', [...addonIds].sort().join(',')].join('|'),
-            productId: product.id,
-            name: product.name,
-            imageUrl: product.imageUrl || '',
-            variantId,
-            variantName: priced.variant?.name || null,
-            addons: priced.addons.map((addon) => ({ id: addon.id, name: addon.name, price: Number(addon.price) || 0 })),
-            quantity,
-            unitPrice: priced.unit,
-          })}>Add {money(priced.unit * quantity)}</button>
+          <button type="button" className="rounded-full bg-brand px-5 py-3 font-semibold text-white" onClick={() => {
+            const chosen = Array.from({ length: extraScoops }, (_, index) => flavors.find((flavor) => flavor.id === flavorIds[index])).filter(Boolean);
+            if (extraScoops > 0 && chosen.length < extraScoops) {
+              setChoiceError(extraScoops === 1 ? 'Choose the second scoop.' : 'Choose a flavor for each extra scoop.');
+              return;
+            }
+            setChoiceError('');
+            const flavorKey = chosen.map((flavor) => flavor.id).join(',');
+            const savedFlavors = extraScoops > 0
+              ? [{ id: 'base', name: product.name }, ...chosen.map((flavor) => ({ id: flavor.id, name: flavor.name }))]
+              : [];
+            onAdd({
+              key: [product.id, variantId || '', [...addonIds].sort().join(','), flavorKey].join('|'),
+              productId: product.id,
+              name: product.name,
+              imageUrl: product.imageUrl || '',
+              variantId,
+              variantName: priced.variant?.name || null,
+              flavors: savedFlavors,
+              addons: priced.addons.map((addon) => ({ id: addon.id, name: addon.name, price: Number(addon.price) || 0 })),
+              quantity,
+              unitPrice: priced.unit,
+            });
+          }}>Add {money(priced.unit * quantity)}</button>
         </div>
       </div>
     </div>

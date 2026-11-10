@@ -38,7 +38,7 @@ export function CartPage() {
                 <div className="flex items-start justify-between gap-3">
                   <div>
                     <p className="font-bold leading-snug">{line.name}</p>
-                    <p className="text-sm leading-snug text-stone-500">{[line.variantName, ...(line.addons || []).map((addon) => addon.name)].filter(Boolean).join(' · ') || 'Standard'}</p>
+                    <p className="text-sm leading-snug text-stone-500">{[line.variantName, ...(line.flavors || []).map((flavor) => flavor.name), ...(line.addons || []).map((addon) => addon.name)].filter(Boolean).join(' · ') || 'Standard'}</p>
                   </div>
                   <p className="shrink-0 font-bold">{money(line.unitPrice * line.quantity)}</p>
                 </div>

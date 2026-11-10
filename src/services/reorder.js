@@ -31,6 +31,11 @@ export function planReorder(menu, items) {
     } else if (variants.length === 1) {
       variant = variants[0];
     }
+    const flavorList = product.flavors || [];
+    const pickedFlavors = (item.flavors || []).map((flavor) => flavorList.find((entry) => entry.id === flavor.id)).filter(Boolean);
+    if ((item.flavors || []).length > 0 && pickedFlavors.length !== (item.flavors || []).length) {
+      notes.push(`${product.name}: a flavor from the last order is no longer offered`);
+    }
     const wanted = (item.addons || []).map((addon) => addon.id).filter(Boolean);
     const addons = (product.addons || []).filter((addon) => wanted.includes(addon.id));
     if (wanted.some((id) => !addons.some((addon) => addon.id === id))) {
@@ -43,12 +48,13 @@ export function planReorder(menu, items) {
     }
     const quantity = Math.max(1, Math.floor(Number(item.quantity) || 1));
     lines.push({
-      key: [product.id, variant?.id || '', addons.map((addon) => addon.id).sort().join(',')].join('|'),
+      key: [product.id, variant?.id || '', addons.map((addon) => addon.id).sort().join(','), pickedFlavors.map((flavor) => flavor.id).join(',')].join('|'),
       productId: product.id,
       name: product.name,
       imageUrl: product.imageUrl || item.imageUrl || '',
       variantId: variant?.id || null,
       variantName: priced.variant?.name || null,
+      flavors: pickedFlavors.map((flavor) => ({ id: flavor.id, name: flavor.name })),
       addons: priced.addons.map((addon) => ({ id: addon.id, name: addon.name, price: Number(addon.price) || 0 })),
       quantity,
       unitPrice: priced.unit,

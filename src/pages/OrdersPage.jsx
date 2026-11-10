@@ -221,7 +221,7 @@ export function OrderPage() {
   return (
     <div className="px-4 py-6">
       <p className="text-sm font-semibold text-brand">Order {order.orderNumber}</p>
-      <h1 key={order.orderStatus} className="status-line mt-1 text-2xl font-bold">{statusLabels[order.orderStatus] || 'Order update'}</h1>
+      <h1 key={order.orderStatus} className="status-line mt-1 text-2xl font-bold">{order.paymentMethod === 'cod' && order.orderStatus === 'PENDING_PAYMENT_VERIFICATION' ? 'Pending' : (statusLabels[order.orderStatus] || 'Order update')}</h1>
       <div className="mt-4 grid gap-2">
         {steps.map((step, index) => (
           <div key={step} style={{ animationDelay: `${index * 40}ms` }} className={`card-pop rounded-2xl px-3 py-2 text-sm transition ${index === active ? 'scale-[1.02] bg-brand font-semibold text-white shadow-md' : index < active ? 'bg-orange-50 font-semibold text-brand' : 'bg-white text-stone-400'}`}>{statusLabels[step]}</div>
@@ -237,7 +237,7 @@ export function OrderPage() {
               </div>
               <div className="min-w-0 flex-1">
                 <p className="font-bold leading-snug">{item.quantity} × {item.name}</p>
-                <p className="text-sm text-stone-500">{[item.variantName, ...(item.addons || []).map((addon) => addon.name)].filter(Boolean).join(' · ')}</p>
+                <p className="text-sm text-stone-500">{[item.variantName, ...(item.flavors || []).map((flavor) => flavor.name), ...(item.addons || []).map((addon) => addon.name)].filter(Boolean).join(' · ')}</p>
               </div>
               <p className="shrink-0 font-bold">{money(item.lineTotal || (item.unitPrice || 0) * (item.quantity || 1))}</p>
             </div>
