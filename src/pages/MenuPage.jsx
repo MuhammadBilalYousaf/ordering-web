@@ -50,7 +50,10 @@ export function MenuPage() {
     <div>
       <header className="flex items-end justify-between gap-3 px-4 pb-2 pt-5 md:px-6 md:pt-8">
         <div>
-          <p className="text-sm text-stone-500 md:hidden">{business.name}</p>
+          <p className="flex items-center gap-2 text-sm text-stone-500 md:hidden">
+            {business.logoUrl ? <img src={business.logoUrl} alt="" className="h-7 w-7 rounded-lg bg-white object-contain p-0.5 shadow-sm" /> : null}
+            <span className="truncate">{business.name}</span>
+          </p>
           <h1 className="text-2xl font-bold">Menu</h1>
         </div>
         <button type="button" className="rounded-full bg-ink px-4 py-2 text-sm font-semibold text-white shadow-sm transition hover:scale-[1.03]" onClick={() => setSearchOpen(true)}>Search</button>
@@ -109,8 +112,8 @@ function ProductCard({ item, index, onAdd }) {
     <button type="button" style={{ animationDelay: `${Math.min(index, 12) * 35}ms` }} className="card-pop group overflow-hidden rounded-2xl bg-white text-left shadow-md shadow-stone-300/60 transition duration-300 hover:-translate-y-1 hover:shadow-lg" onClick={onAdd}>
       <div className="overflow-hidden bg-orange-50">
         {item.imageUrl
-          ? <img src={item.imageUrl} alt="" className="aspect-square w-full object-cover transition duration-500 group-hover:scale-105 md:aspect-[4/3] md:max-h-40" />
-          : <div className="flex aspect-square w-full items-center justify-center text-2xl md:aspect-[4/3] md:max-h-40 md:text-4xl">🍽️</div>}
+          ? <img src={item.imageUrl} alt="" className="aspect-square w-full object-cover transition duration-500 group-hover:scale-105" />
+          : <div className="flex aspect-square w-full items-center justify-center text-2xl">🍽️</div>}
       </div>
       <div className="p-2 md:p-3">
         <h2 className="line-clamp-2 text-xs font-bold leading-snug md:text-sm">{item.name}</h2>
@@ -147,7 +150,11 @@ function ProductSheet({ product, onClose, onAdd }) {
   return (
     <div className="fixed inset-0 z-30 flex items-end bg-ink/40 md:items-center md:justify-center md:p-8" onClick={onClose}>
       <div className="sheet-enter max-h-[88vh] w-full overflow-auto rounded-t-3xl bg-white p-5 md:max-w-lg md:rounded-3xl" onClick={(event) => event.stopPropagation()}>
-        {product.imageUrl ? <img src={product.imageUrl} alt="" className="mb-3 h-44 w-full rounded-2xl object-cover" /> : null}
+        {product.imageUrl ? (
+          <div className="relative mb-3 aspect-square w-full overflow-hidden rounded-2xl bg-orange-50">
+            <img src={product.imageUrl} alt="" className="absolute inset-0 h-full w-full object-cover" />
+          </div>
+        ) : null}
         <h2 className="text-xl font-bold">{product.name}</h2>
         {product.description ? <p className="mt-1 text-sm text-stone-500">{product.description}</p> : null}
         <div className="mt-4 grid gap-2">

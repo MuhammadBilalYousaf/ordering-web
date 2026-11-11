@@ -35,8 +35,13 @@ export function HomePage() {
   return (
     <div>
       <header className="bg-ink px-5 pb-8 pt-8 text-white md:mx-6 md:mt-6 md:rounded-3xl md:px-10 md:py-12">
-        <p className="text-xs uppercase tracking-[0.2em] text-orange-200">Welcome</p>
-        <h1 className="mt-2 text-3xl font-bold md:text-5xl">{business.name}</h1>
+        <div className="flex items-center gap-4">
+          {business.logoUrl ? <img src={business.logoUrl} alt="" className="h-16 w-16 shrink-0 rounded-2xl bg-white object-contain p-1.5 md:h-20 md:w-20" /> : null}
+          <div className="min-w-0">
+            <p className="text-xs uppercase tracking-[0.2em] text-orange-200">Welcome</p>
+            <h1 className="mt-2 text-3xl font-bold md:text-5xl">{business.name}</h1>
+          </div>
+        </div>
         <p className="mt-2 max-w-lg text-sm text-stone-300">Order as a guest, or sign in so repeat visits can earn discounts later.</p>
       </header>
       <FeedbackCarousel businessId={business.businessId} />

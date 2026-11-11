@@ -3,6 +3,7 @@ import { Link } from 'react-router-dom';
 import { useBusiness } from '../context/BusinessContext';
 import { awardCompletedOrders, watchLoyalty, watchLoyaltyActivity } from '../services/loyalty';
 import { continueAsGuest, isGuest, loadCustomer, sendCustomerPasswordReset, signInCustomer, signOutCustomer, signUpCustomer, watchAuth } from '../services/auth';
+import { phoneDigits, validPakPhone } from '../services/paymentChoice';
 
 export function AccountPage() {
   const { slug, business } = useBusiness();
@@ -131,12 +132,18 @@ export function AccountPage() {
       </div>
       <form className="mt-4 grid gap-3" onSubmit={(event) => {
         event.preventDefault();
-        if (mode === 'signup') run(() => signUpCustomer({ name, email, password, phone }));
+        if (mode === 'signup') {
+          if (!validPakPhone(phone)) {
+            setError('Enter an 11-digit phone number starting with 03.');
+            return;
+          }
+          run(() => signUpCustomer({ name, email, password, phone }));
+        }
         else run(() => signInCustomer({ email, password }));
       }}>
         {mode === 'signup' ? <input className="rounded-2xl border px-3 py-3" placeholder="Name" value={name} onChange={(event) => setName(event.target.value)} /> : null}
         <input className="rounded-2xl border px-3 py-3" placeholder="Email" value={email} onChange={(event) => setEmail(event.target.value)} />
-        {mode === 'signup' ? <input className="rounded-2xl border px-3 py-3" placeholder="Phone" value={phone} onChange={(event) => setPhone(event.target.value)} /> : null}
+        {mode === 'signup' ? <input className="rounded-2xl border px-3 py-3" placeholder="03000000000" inputMode="numeric" maxLength={11} autoComplete="tel" value={phone} onChange={(event) => setPhone(phoneDigits(event.target.value))} /> : null}
         <input className="rounded-2xl border px-3 py-3" placeholder="Password" type="password" value={password} onChange={(event) => setPassword(event.target.value)} />
         {mode === 'signin' ? (
           <button type="button" className="text-left text-sm font-semibold text-brand" onClick={() => {

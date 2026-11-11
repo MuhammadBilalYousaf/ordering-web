@@ -9,7 +9,7 @@ import { discountForPoints, maxRedeemablePoints } from '../services/loyaltyMath'
 import { enableOrderAlerts } from '../services/notify';
 import { PaymentDetails } from '../components/PaymentDetails';
 import { compressPaymentProof, extractPaymentReference } from '../services/paymentProof';
-import { cashOnDeliveryEnabled, checkoutPaymentError } from '../services/paymentChoice';
+import { cashOnDeliveryEnabled, checkoutPaymentError, phoneDigits } from '../services/paymentChoice';
 import { placeOrder } from '../services/store';
 import { money } from '../utils/pricing';
 
@@ -26,7 +26,7 @@ export function CheckoutPage() {
     if (user === undefined) return;
     const cached = readCustomer(slug, identity);
     setName(cached.name);
-    setPhone(cached.phone);
+    setPhone(phoneDigits(cached.phone));
   }, [user, slug]);
   const [orderType, setOrderType] = useState('takeaway');
   const [payMethod, setPayMethod] = useState('prepaid');
@@ -159,8 +159,8 @@ export function CheckoutPage() {
         </div>
       ) : null}
       <p className="text-stone-500">Total {money(cart.subtotal)}. Allow notifications so status updates still appear after you close this page.</p>
-      <label className="mt-4 block text-sm font-semibold">Name<input className="mt-1 w-full rounded-2xl border border-stone-200 px-3 py-3" value={name} onChange={(event) => setName(event.target.value)} /></label>
-      <label className="mt-3 block text-sm font-semibold">Phone<input className="mt-1 w-full rounded-2xl border border-stone-200 px-3 py-3" value={phone} onChange={(event) => setPhone(event.target.value)} inputMode="tel" /></label>
+      <label className="mt-4 block text-sm font-semibold">Name<input className="mt-1 w-full rounded-2xl border border-stone-200 px-3 py-3" value={name} onChange={(event) => setName(event.target.value)} placeholder="Your name" autoComplete="name" /></label>
+      <label className="mt-3 block text-sm font-semibold">Phone<input className="mt-1 w-full rounded-2xl border border-stone-200 px-3 py-3" value={phone} onChange={(event) => setPhone(phoneDigits(event.target.value))} inputMode="numeric" maxLength={11} placeholder="03000000000" autoComplete="tel" /></label>
       <div className="mt-3 grid grid-cols-2 gap-2">
         {['takeaway', 'dineIn'].map((type) => (
           <button key={type} type="button" className={`rounded-2xl border py-3 font-semibold ${orderType === type ? 'border-brand bg-orange-50' : 'border-stone-200 bg-white'}`} onClick={() => setOrderType(type)}>{type === 'dineIn' ? 'Dine-in' : 'Takeaway'}</button>

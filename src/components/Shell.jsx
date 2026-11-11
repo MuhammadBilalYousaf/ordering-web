@@ -18,7 +18,8 @@ export function Shell({ slug, children }) {
     <div className="min-h-screen pb-20 md:pb-10">
       <header className="sticky top-0 z-30 hidden border-b border-stone-200 bg-white/95 backdrop-blur md:block">
         <div className="mx-auto flex max-w-6xl items-center gap-6 px-6 py-3">
-          <NavLink to={`/b/${slug}`} end className="min-w-0 shrink-0">
+          <NavLink to={`/b/${slug}`} end className="flex min-w-0 shrink-0 items-center gap-2">
+            {business?.logoUrl ? <img src={business.logoUrl} alt="" className="h-9 w-9 shrink-0 rounded-xl bg-stone-50 object-contain p-0.5" /> : null}
             <p className="truncate text-lg font-bold text-ink">{business?.name || 'Order'}</p>
           </NavLink>
           <nav className="flex flex-1 items-center gap-1">

@@ -112,12 +112,12 @@ function OrderRow({ slug, order }) {
   return (
     <Link to={`/b/${slug}/order/${order.id}`} className="card-pop block overflow-hidden rounded-3xl bg-white shadow-md shadow-stone-300/60 transition hover:-translate-y-0.5 hover:shadow-lg">
       {preview.length > 0 ? (
-        <div className="flex h-24">
+        <div className="flex gap-1 p-3 pb-0">
           {preview.map((item, index) => {
             const src = productImage(menu, item.productId, item.imageUrl);
             return (
-              <div key={`${item.name}-${index}`} className="thumb-in relative flex-1 overflow-hidden bg-orange-50" style={{ animationDelay: `${index * 60}ms` }}>
-                {src ? <img src={src} alt="" className="h-full w-full object-cover" /> : <div className="flex h-full items-center justify-center text-2xl">🍽️</div>}
+              <div key={`${item.name}-${index}`} className="thumb-in relative aspect-square h-16 w-16 shrink-0 overflow-hidden rounded-2xl bg-orange-50" style={{ animationDelay: `${index * 60}ms` }}>
+                {src ? <img src={src} alt="" className="absolute inset-0 h-full w-full object-cover" /> : <div className="flex h-full items-center justify-center text-2xl">🍽️</div>}
               </div>
             );
           })}
@@ -232,8 +232,8 @@ export function OrderPage() {
           const src = productImage(menu, item.productId, item.imageUrl);
           return (
             <div key={`${item.productId || item.name}-${index}`} style={{ animationDelay: `${index * 50}ms` }} className="card-pop flex gap-3 rounded-3xl bg-white p-3 shadow-md shadow-stone-300/60">
-              <div className="thumb-in h-16 w-16 shrink-0 overflow-hidden rounded-2xl bg-orange-50">
-                {src ? <img src={src} alt="" className="h-full w-full object-cover" /> : <div className="flex h-full items-center justify-center text-xl">🍽️</div>}
+              <div className="thumb-in relative aspect-square h-16 w-16 shrink-0 overflow-hidden rounded-2xl bg-orange-50">
+                {src ? <img src={src} alt="" className="absolute inset-0 h-full w-full object-cover" /> : <div className="flex h-full items-center justify-center text-xl">🍽️</div>}
               </div>
               <div className="min-w-0 flex-1">
                 <p className="font-bold leading-snug">{item.quantity} × {item.name}</p>

@@ -14,9 +14,9 @@ function productImage(menu, productId, fallback) {
 
 function ItemPhoto({ src, alt }) {
   return (
-    <div className="thumb-in h-20 w-20 shrink-0 overflow-hidden rounded-2xl bg-orange-50 shadow-sm">
+    <div className="thumb-in relative aspect-square h-20 w-20 shrink-0 overflow-hidden rounded-2xl bg-orange-50 shadow-sm">
       {src
-        ? <img src={src} alt={alt} className="h-full w-full object-cover" />
+        ? <img src={src} alt={alt} className="absolute inset-0 h-full w-full object-cover" />
         : <div className="flex h-full w-full items-center justify-center text-2xl">🍽️</div>}
     </div>
   );
