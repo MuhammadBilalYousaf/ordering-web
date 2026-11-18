@@ -19,7 +19,34 @@ export function watchMenu(businessId, onData, onError) {
   if (!businessId) return () => {};
   return onSnapshot(
     doc(db, 'publicMenus', businessId),
-    (snap) => onData(snap.exists() ? snap.data() : { categories: [] }),
+    async (snap) => {
+      const menu = snap.exists() ? snap.data() : { categories: [] };
+      const ids = [];
+      for (const category of menu.categories || []) {
+        for (const product of category.products || []) {
+          const stored = product.imageUrl || '';
+          if (stored.startsWith('menuimg:')) ids.push(stored.slice('menuimg:'.length));
+        }
+      }
+      const photos = {};
+      await Promise.all(ids.map(async (id) => {
+        if (!id) return;
+        try {
+          const image = await getDoc(doc(db, 'publicMenuImages', id));
+          photos[id] = image.exists() ? image.data().image || '' : '';
+        } catch {
+          photos[id] = '';
+        }
+      }));
+      for (const category of menu.categories || []) {
+        for (const product of category.products || []) {
+          const stored = product.imageUrl || '';
+          if (stored.startsWith('menuimg:')) product.displayUrl = photos[stored.slice('menuimg:'.length)] || '';
+          else if (stored.startsWith('http') || stored.startsWith('data:image')) product.displayUrl = stored;
+        }
+      }
+      onData(menu);
+    },
     () => onError('The menu could not be loaded.'),
   );
 }

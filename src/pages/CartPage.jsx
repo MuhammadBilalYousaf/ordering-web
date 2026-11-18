@@ -4,10 +4,11 @@ import { useCart } from '../context/CartContext';
 import { money } from '../utils/pricing';
 
 function productImage(menu, productId, fallback) {
-  if (fallback) return fallback;
+  if ((fallback || '').startsWith('http') || (fallback || '').startsWith('data:image')) return fallback;
   for (const category of menu?.categories || []) {
     const product = (category.products || []).find((item) => item.id === productId);
-    if (product?.imageUrl) return product.imageUrl;
+    if (product?.displayUrl) return product.displayUrl;
+    if ((product?.imageUrl || '').startsWith('http') || (product?.imageUrl || '').startsWith('data:image')) return product.imageUrl;
   }
   return '';
 }

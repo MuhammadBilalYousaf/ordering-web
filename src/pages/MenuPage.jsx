@@ -14,7 +14,9 @@ export function MenuPage() {
   const [query, setQuery] = useState('');
   if (error) return <p className="p-6">{error}</p>;
   if (!business || !menu) return <MenuSkeleton />;
-  const categories = (menu.categories || []).filter((category) => category.active !== false);
+  const categories = (menu.categories || [])
+    .filter((category) => category.active !== false)
+    .sort((a, b) => (Number(a.sort) || 0) - (Number(b.sort) || 0));
   const selected = categories.find((category) => category.id === categoryId) || categories[0];
   const products = (selected?.products || []).filter((item) => item.available !== false);
   const needle = query.trim().toLowerCase();
@@ -65,7 +67,7 @@ export function MenuPage() {
       </div>
       <div className="grid grid-cols-3 gap-2 px-3 pb-24 sm:gap-3 sm:px-4 md:grid-cols-4 md:px-6 lg:grid-cols-5 xl:grid-cols-6">
         {products.map((item, index) => (
-          <ProductCard key={item.id} item={item} index={index} onAdd={() => addProduct(item)} />
+          <ProductCard key={item.id} item={item} index={index} onOpen={() => setProduct(item)} onAdd={() => addProduct(item)} />
         ))}
       </div>
       {cart.count > 0 ? <Link to={`/b/${slug}/cart`} className="fixed bottom-16 left-1/2 z-10 w-[min(24rem,calc(100%-1.5rem))] -translate-x-1/2 rounded-full bg-brand px-5 py-2.5 text-center text-sm font-semibold text-white shadow-lg md:bottom-6">View cart · {money(cart.subtotal)}</Link> : null}
@@ -87,7 +89,7 @@ export function MenuPage() {
                 </div>
               ) : null}
               {matches.map(({ item, category }) => (
-                <button key={`${category.id}-${item.id}`} type="button" className="flex w-full items-center gap-3 rounded-2xl px-2 py-2 text-left transition hover:bg-orange-50" onClick={() => { setSearchOpen(false); addProduct(item); }}>
+                <button key={`${category.id}-${item.id}`} type="button" className="flex w-full items-center gap-3 rounded-2xl px-2 py-2 text-left transition hover:bg-orange-50" onClick={() => { setSearchOpen(false); setProduct(item); }}>
                   <span className="min-w-0 flex-1">
                     <span className="block truncate font-semibold">{item.name}</span>
                     <span className="block truncate text-xs text-stone-500">{category.name}</span>
@@ -107,12 +109,12 @@ function fromPrice(item) {
   return item.variants?.length ? Math.min(...item.variants.map((variant) => Number(variant.price) || 0)) : unitPrice(item, null, []).unit;
 }
 
-function ProductCard({ item, index, onAdd }) {
+function ProductCard({ item, index, onOpen, onAdd }) {
   return (
-    <button type="button" style={{ animationDelay: `${Math.min(index, 12) * 35}ms` }} className="card-pop group overflow-hidden rounded-2xl bg-white text-left shadow-md shadow-stone-300/60 transition duration-300 hover:-translate-y-1 hover:shadow-lg" onClick={onAdd}>
+    <div role="button" tabIndex={0} style={{ animationDelay: `${Math.min(index, 12) * 35}ms` }} className="card-pop group cursor-pointer overflow-hidden rounded-2xl bg-white text-left shadow-md shadow-stone-300/60 transition duration-300 hover:-translate-y-1 hover:shadow-lg" onClick={onOpen} onKeyDown={(event) => { if (event.key === 'Enter' || event.key === ' ') { event.preventDefault(); onOpen(); } }}>
       <div className="overflow-hidden bg-orange-50">
-        {item.imageUrl
-          ? <img src={item.imageUrl} alt="" className="aspect-square w-full object-cover transition duration-500 group-hover:scale-105" />
+        {(item.displayUrl || item.imageUrl || '').startsWith('http') || (item.displayUrl || '').startsWith('data:image')
+          ? <img src={item.displayUrl || item.imageUrl} alt="" className="aspect-square w-full object-cover transition duration-500 group-hover:scale-105" />
           : <div className="flex aspect-square w-full items-center justify-center text-2xl">🍽️</div>}
       </div>
       <div className="p-2 md:p-3">
@@ -120,10 +122,10 @@ function ProductCard({ item, index, onAdd }) {
         {item.description ? <p className="mt-1 hidden text-xs leading-snug text-stone-500 md:line-clamp-2 md:block">{item.description}</p> : null}
         <div className="mt-1.5 flex items-center justify-between gap-1">
           <span className="text-xs font-bold md:text-sm">{money(fromPrice(item))}</span>
-          <span className="rounded-full bg-brand px-2 py-1 text-[10px] font-semibold text-white md:px-3 md:text-xs">Add</span>
+          <button type="button" className="rounded-full bg-brand px-2 py-1 text-[10px] font-semibold text-white md:px-3 md:text-xs" onClick={(event) => { event.stopPropagation(); onAdd(); }}>Add</button>
         </div>
       </div>
-    </button>
+    </div>
   );
 }
 
@@ -150,9 +152,9 @@ function ProductSheet({ product, onClose, onAdd }) {
   return (
     <div className="fixed inset-0 z-30 flex items-end bg-ink/40 md:items-center md:justify-center md:p-8" onClick={onClose}>
       <div className="sheet-enter max-h-[88vh] w-full overflow-auto rounded-t-3xl bg-white p-5 md:max-w-lg md:rounded-3xl" onClick={(event) => event.stopPropagation()}>
-        {product.imageUrl ? (
+        {product.displayUrl || (product.imageUrl || '').startsWith('http') ? (
           <div className="relative mb-3 aspect-square w-full overflow-hidden rounded-2xl bg-orange-50">
-            <img src={product.imageUrl} alt="" className="absolute inset-0 h-full w-full object-cover" />
+            <img src={product.displayUrl || product.imageUrl} alt="" className="absolute inset-0 h-full w-full object-cover" />
           </div>
         ) : null}
         <h2 className="text-xl font-bold">{product.name}</h2>
